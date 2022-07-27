@@ -3,7 +3,7 @@
 import os
 from gym.spaces import Box
 
-from metaworld.envs import reward_utils
+from earl_benchmark.envs.utils import tolerance
 from metaworld.envs.mujoco.sawyer_xyz.v2.sawyer_door_close_v2 import SawyerDoorCloseEnvV2
 from metaworld.envs.mujoco.sawyer_xyz.sawyer_xyz_env import _assert_task_is_set
 
@@ -138,7 +138,7 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
       }
       return reward, info
 
-  def compute_reward(self, obs, actions=None):
+  def _compute_reward_old(self, obs, actions=None):
     _TARGET_RADIUS = 0.05
     tcp = obs[:3]
     obj = obs[4:7]
@@ -149,13 +149,13 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
     obj_to_target = np.linalg.norm(obj - target)
 
     in_place_margin = np.linalg.norm(self.obj_init_pos - target)
-    in_place = reward_utils.tolerance(obj_to_target,
+    in_place = tolerance(obj_to_target,
                                 bounds=(0, _TARGET_RADIUS),
                                 margin=in_place_margin,
                                 sigmoid='gaussian',)
 
     hand_margin = np.linalg.norm(self.hand_init_pos - obj) + 0.1
-    hand_in_place = reward_utils.tolerance(tcp_to_obj,
+    hand_in_place = tolerance(tcp_to_obj,
                                 bounds=(0, 0.25*_TARGET_RADIUS),
                                 margin=hand_margin,
                                 sigmoid='gaussian',)
@@ -169,6 +169,38 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
       reward = float(self.is_successful(obs=obs))
     
     return [reward, obj_to_target, hand_in_place]
+
+  def compute_reward(self, obs, actions=None, vectorized=True):
+    obs = np.atleast_2d(obs)
+
+    _TARGET_RADIUS = 0.05
+    tcp = obs[:,:3]
+    obj = obs[:,4:7]
+    target = obs[:,11:14]
+
+    tcp_to_target = np.linalg.norm(tcp - target, axis=-1)
+    tcp_to_obj = np.linalg.norm(tcp - obj, axis=-1)
+    obj_to_target = np.linalg.norm(obj - target, axis=-1)
+
+    in_place_margin = np.linalg.norm(self.obj_init_pos - target, axis=-1)
+    in_place = tolerance(obj_to_target,
+                                bounds=(0, _TARGET_RADIUS),
+                                margin=in_place_margin,
+                                sigmoid='gaussian',)
+
+    hand_margin = np.linalg.norm(self.hand_init_pos - obj, axis=-1) + 0.1
+    hand_in_place = tolerance(tcp_to_obj,
+                                bounds=(0, 0.25*_TARGET_RADIUS),
+                                margin=hand_margin,
+                                sigmoid='gaussian',)
+
+    reward = 3 * hand_in_place + 6 * in_place
+    reward = np.where(obj_to_target < _TARGET_RADIUS, 10.0, reward)
+
+    if self._reward_type == 'sparse':
+      reward = SawyerDoorV2.is_successful(self, obs=obs)
+
+    return [np.squeeze(reward), np.squeeze(obj_to_target), np.squeeze(hand_in_place)]
 
   def is_successful(self, obs=None):
     if obs is None:

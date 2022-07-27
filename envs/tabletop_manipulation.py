@@ -147,7 +147,7 @@ class TabletopManipulation(MujocoEnv):
     self.set_state(curr_qpos)
     self.sim.forward()
 
-  def compute_reward(self, obs):
+  def _compute_reward_old(self, obs):
     if self._reward_type == "sparse":
       reward = float(self.is_successful(obs=obs))
     elif self._reward_type == "dense":
@@ -163,6 +163,24 @@ class TabletopManipulation(MujocoEnv):
       reward += 0.5 * np.exp(-(grip_to_object**2) / 0.01)
 
     return reward
+
+  def compute_reward(self, obs, vectorized=True):
+    if self._reward_type == "sparse":
+      reward = TabletopManipulation.is_successful(self, obs=obs)
+    elif self._reward_type == "dense":
+      # remove gripper, attached object from reward computation
+      obs = np.atleast_2d(obs)
+      reward = -np.linalg.norm(obs[:,2:4] - obs[:,8:-2], axis=-1)
+      for obj_idx in range(1, 2):
+        reward += 2. * np.exp(
+            -(np.linalg.norm(obs[:,2 * obj_idx:2 * obj_idx + 2] -
+                             obs[:,2 * obj_idx + 6:2 * obj_idx + 8], axis=-1)**2) / 0.01)
+
+      grip_to_object = 0.5 * np.linalg.norm(obs[:,:2] - obs[:,2:4], axis=-1)
+      reward += -grip_to_object
+      reward += 0.5 * np.exp(-(grip_to_object**2) / 0.01)
+
+    return np.squeeze(reward)
 
   def is_successful(self, obs=None):
     if obs is None:
