@@ -30,9 +30,9 @@ class PersistentStateWrapper(Wrapper):
 
     return obs, reward, done, info
 
-  def is_successful(self, obs=None):
+  def is_successful(self, obs=None, **kwargs):
     if hasattr(self.env, 'is_successful'):
-        return self.env.is_successful(obs)
+        return self.env.is_successful(obs, **kwargs)
     else:
         return False
 
