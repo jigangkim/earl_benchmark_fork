@@ -183,14 +183,10 @@ class TabletopManipulation(MujocoEnv):
     return np.squeeze(reward)
 
   def is_successful(self, obs=None, vectorized=True):
+    return self.dist_to_goal(obs=obs, vectorized=vectorized) <= 0.2
+
+  def dist_to_goal(self, obs=None, vectorized=True):
     if obs is None:
       obs = self._get_obs()
 
-    if obs.ndim == 1:
-      return np.linalg.norm(obs[:4] - obs[6:-2]) <= 0.2 # original code: this doesn't make sense..
-      # return np.linalg.norm(obs[2:4] - obs[8:-2]) <= 0.2 # "fixed" code
-    elif obs.ndim == 2:
-      return np.linalg.norm(obs[:,:4] - obs[:,6:-2], axis=-1) <= 0.2 # original code: this doesn't make sense..
-      # return np.linalg.norm(obs[:,2:4] - obs[:,8:-2], axis=-1) <= 0.2 # "fixed" code
-    else:
-      raise ValueError(f'Invalid obs dimension: {obs.ndim}')
+    return np.linalg.norm(obs[:,:4] - obs[:,6:-2], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[:4] - obs[6:-2])

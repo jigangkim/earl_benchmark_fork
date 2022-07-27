@@ -283,10 +283,13 @@ class SawyerPegV2(SawyerXYZEnv):
     return [reward, tcp_to_obj, tcp_opened, obj_to_target, object_grasped, in_place, collision_boxes, ip_orig]
 
   def is_successful(self, obs=None, vectorized=True):
+    return self.dist_to_goal(obs=obs, vectorized=vectorized) <= self.TARGET_RADIUS
+
+  def dist_to_goal(self, obs=None, vectorized=True):
     if obs is None:
       obs = self._get_obs()
 
-    return np.linalg.norm(obs[:,4:7] - obs[:,11:14], axis=-1) <= self.TARGET_RADIUS if obs.ndim == 2 else np.linalg.norm(obs[4:7] - obs[11:14]) <= self.TARGET_RADIUS
+    return np.linalg.norm(obs[:,4:7] - obs[:,11:14], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[4:7] - obs[11:14])
 
   def viewer_setup(self):
     self.viewer.cam.distance = 2.0

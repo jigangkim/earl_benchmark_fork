@@ -203,10 +203,13 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
     return [np.squeeze(reward), np.squeeze(obj_to_target), np.squeeze(hand_in_place)]
 
   def is_successful(self, obs=None, vectorized=True):
+    return self.dist_to_goal(obs=obs, vectorized=vectorized) <= 0.02
+
+  def dist_to_goal(self, obs=None, vectorized=True):
     if obs is None:
       obs = self._get_obs()
-
-    return np.linalg.norm(obs[:,4:7] - obs[:,11:14], axis=-1) <= 0.02 if obs.ndim == 2 else np.linalg.norm(obs[4:7] - obs[11:14]) <= 0.02
+    
+    return np.linalg.norm(obs[:,4:7] - obs[:,11:14], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[4:7] - obs[11:14])
 
   # functions for rendering
   def viewer_setup(self):
