@@ -166,7 +166,7 @@ class TabletopManipulation(MujocoEnv):
 
   def compute_reward(self, obs, vectorized=True):
     if self._reward_type == "sparse":
-      reward = TabletopManipulation.is_successful(self, obs=obs)
+      reward = float(self.is_successful(obs=obs))
     elif self._reward_type == "dense":
       # remove gripper, attached object from reward computation
       obs = np.atleast_2d(obs)

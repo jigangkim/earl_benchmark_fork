@@ -198,7 +198,7 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
     reward = np.where(obj_to_target < _TARGET_RADIUS, 10.0, reward)
 
     if self._reward_type == 'sparse':
-      reward = SawyerDoorV2.is_successful(self, obs=obs)
+      reward = float(self.is_successful(obs=obs))
 
     return [np.squeeze(reward), np.squeeze(obj_to_target), np.squeeze(hand_in_place)]
 
