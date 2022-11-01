@@ -42,12 +42,22 @@
       <joint name='bally' type='slide' axis='0 1 0' pos='0 0 0'  limited="true" range="-3 3"/>
     </body>
 
+    <!-- <body mocap="true" name="goal:fist" pos="0 0 1">
+      <site name="goal:fist" size="0.4" pos="0 0 0" rgba="0 0 0 0.2" type="sphere"/>
+    </body> -->
+    <site name="goal:fist" pos="0 0 1" size="0.1" rgba="0 0 0 1"/>
+
     <body name="redcube" pos="0 0 0">
       <!-- <geom name="rc" type="box" size="0.2 0.2 0.2" pos="0 0 0.2" rgba="1 0 0 1" conaffinity="0" contype="0"/> -->
       <geom name="rc" type="mesh" mesh="mug" size="0.2 0.2 0.2" pos="0 0 0" conaffinity="0" contype="0"/>
       <joint name='rcx' type='slide' axis='1 0 0' pos='0 0 0' limited="true" range="-3 3"/>
       <joint name='rcy' type='slide' axis='0 1 0' pos='0 0 0' limited="true" range="-3 3"/>
     </body>
+
+    <!-- <body mocap="true" name="goal:redcube" pos="0 0 1">
+      <site name="goal:redcube" size="0.4" pos="0 0 0" rgba="1 0 1 0.2" type="sphere"/>
+    </body> -->
+    <site name="goal:redcube" pos="0 0 1" size="0.1" rgba="0.8 0 0.8 1"/>
 
     <!-- <body name="bluecube" pos="0 0 0">
       <geom name="bc" type="box" size="0.2 0.2 0.2" pos="0 0 0.2" rgba="0 0 1 1" conaffinity="0" contype="0"/>

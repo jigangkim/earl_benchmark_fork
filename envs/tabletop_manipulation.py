@@ -78,6 +78,12 @@ class TabletopManipulation(MujocoEnv):
       goal = self.get_next_goal()
     self.goal = goal
 
+    # visualize goal
+    target_fist_pos = self.goal[0:2]
+    target_redcube_pos = self.goal[2:4]
+    self.sim.model.site_pos[self.model.site_name2id("goal:fist")][:2] = target_fist_pos
+    self.sim.model.site_pos[self.model.site_name2id("goal:redcube")][:2] = target_redcube_pos
+
   def set_state(self, qpos):
     qpos = np.concatenate([qpos[:4], np.array([-10])])
     qvel = self.sim.data.qvel.copy()
