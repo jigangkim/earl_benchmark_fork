@@ -32,6 +32,18 @@ deployment_eval_config = {
     'train_horizon': int(1e5),
     'eval_horizon': 200,
   },
+  'sawyer_reach': {
+    'num_initial_state_samples': 1,
+    'num_goals': 100,
+    'train_horizon': int(2e5),
+    'eval_horizon': 200,
+  },
+  'sawyer_pickandplace': {
+    'num_initial_state_samples': 15,
+    'num_goals': 1,
+    'train_horizon': int(2e5),
+    'eval_horizon': 200,
+  },
   'kitchen': {
     'num_initial_state_samples': 1,
     'train_horizon': int(1e5),
@@ -61,6 +73,18 @@ continuing_eval_config = {
     'goal_change_frequency': 600,
   },
   'sawyer_peg': {
+    'num_initial_state_samples': 15,
+    'num_goals': 1,
+    'train_horizon': int(5e4),
+    'goal_change_frequency': 400,
+  },
+  'sawyer_reach': {
+    'num_initial_state_samples': 1,
+    'num_goals': 100,
+    'train_horizon': int(5e4),
+    'goal_change_frequency': 400,
+  },
+  'sawyer_pickandplace': {
     'num_initial_state_samples': 15,
     'num_goals': 1,
     'train_horizon': int(5e4),
@@ -132,6 +156,17 @@ class EARLEnvs(object):
       from earl_benchmark.envs import sawyer_peg
       train_env = sawyer_peg.SawyerPegV2(reward_type=self._reward_type,
                                          reset_at_goal=self._reset_train_env_at_goal)
+
+    elif self._env_name == 'sawyer_reach':
+      from earl_benchmark.envs import sawyer_reach_v2
+      train_env = sawyer_reach_v2.SawyerReachV2(reward_type=self._reward_type,
+                                           reset_at_goal=self._reset_train_env_at_goal)
+
+    elif self._env_name == 'sawyer_pickandplace':
+      from earl_benchmark.envs import sawyer_peg_pickandplace
+      train_env = sawyer_peg_pickandplace.SawyerPegPickAndPlaceV2(reward_type=self._reward_type,
+                                         reset_at_goal=self._reset_train_env_at_goal)
+                                         
     elif self._env_name == 'kitchen':
       from earl_benchmark.envs import kitchen
       kitchen_task = self._kwargs.get('kitchen_task', deployment_eval_config[self._env_name]['task'])  
@@ -153,6 +188,12 @@ class EARLEnvs(object):
       from earl_benchmark.envs import sawyer_door
       eval_env = sawyer_door.SawyerDoorV2(reward_type=self._reward_type)
     elif self._env_name == 'sawyer_peg':
+      from earl_benchmark.envs import sawyer_peg
+      eval_env = sawyer_peg.SawyerPegV2(reward_type=self._reward_type)
+    elif self._env_name == 'sawyer_reach':
+      from earl_benchmark.envs import sawyer_reach_v2
+      eval_env = sawyer_reach_v2.SawyerReachV2(reward_type=self._reward_type)
+    elif self._env_name == 'sawyer_pickandplace':
       from earl_benchmark.envs import sawyer_peg
       eval_env = sawyer_peg.SawyerPegV2(reward_type=self._reward_type)
     elif self._env_name == 'kitchen':
@@ -200,6 +241,14 @@ class EARLEnvs(object):
       from earl_benchmark.envs import sawyer_peg
       return sawyer_peg.initial_states
 
+    elif self._env_name == 'sawyer_reach':
+      from earl_benchmark.envs import sawyer_reach_v2
+      return sawyer_reach_v2.initial_states
+
+    elif self._env_name == 'sawyer_pickandplace':
+      from earl_benchmark.envs import sawyer_peg_pickandplace
+      return sawyer_peg_pickandplace.initial_states
+
     elif self._env_name == 'kitchen':
       from earl_benchmark.envs import kitchen
       kitchen_task = self._kwargs.get('kitchen_task', deployment_eval_config[self._env_name]['task'])  
@@ -228,6 +277,14 @@ class EARLEnvs(object):
     elif self._env_name == 'sawyer_peg':
       from earl_benchmark.envs import sawyer_peg
       return sawyer_peg.goal_states
+
+    elif self._env_name == 'sawyer_reach':
+      from earl_benchmark.envs import sawyer_reach_v2
+      return sawyer_reach_v2.goal_states
+    
+    elif self._env_name == 'sawyer_pickandplace':
+      from earl_benchmark.envs import sawyer_peg_pickandplace
+      return sawyer_peg_pickandplace.goal_states
 
     if self._env_name == 'kitchen':
       from earl_benchmark.envs import kitchen

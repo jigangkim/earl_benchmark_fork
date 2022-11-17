@@ -12,7 +12,7 @@ import mujoco_py
 initial_states = np.array([[0.00615235, 0.6001898, 0.19430117]])
 goal_states = np.random.uniform(low=(-0.1, 0.8, 0.1), high=(0.1, 0.9, 0.35), size=(100,3)) # 100 goal states
 
-class SawyerReachEnvV2(SawyerXYZEnv):
+class SawyerReachV2(SawyerXYZEnv):
     """
     Motivation for V2:
         V1 was very difficult to solve because the observation didn't say where
@@ -166,7 +166,7 @@ class SawyerReachEnvV2(SawyerXYZEnv):
         elif self._reward_type == 'sparse':
             reward = np.array(self.is_successful(obs=obs), dtype=np.float32)
 
-        return [reward, tcp_to_target, in_place]
+        return [np.squeeze(reward), np.squeeze(tcp_to_target), np.squeeze(in_place)]
 
     def is_successful(self, obs=None, vectorized=True):
         return self.dist_to_goal(obs=obs, vectorized=vectorized) <= self.TARGET_RADIUS
