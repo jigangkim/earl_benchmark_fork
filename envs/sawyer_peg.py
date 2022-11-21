@@ -292,9 +292,9 @@ class SawyerPegV2(SawyerXYZEnv):
     return np.linalg.norm(obs[:,4:7] - obs[:,11:14], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[4:7] - obs[11:14])
 
   def viewer_setup(self):
-    self.viewer.cam.distance = 2.0
-    self.viewer.cam.elevation = -20
-    self.viewer.cam.azimuth = -150
+    self.viewer.cam.distance = 1.5
+    self.viewer.cam.elevation = -30
+    self.viewer.cam.azimuth = -120
 
   def _get_viewer(self, mode):
     self.viewer = self._viewers.get(mode)
@@ -312,11 +312,10 @@ class SawyerPegV2(SawyerXYZEnv):
     if mode == 'human':
       self._get_viewer(mode).render()
     elif mode == 'rgb_array':
-      return self.sim.render(
-          width, height,
-          mode='offscreen',
-          camera_name='clearview'
-      )[::-1, :, :]
+      self._get_viewer(mode).render(width, height)
+      data = self._get_viewer(mode).read_pixels(width, height, depth=False)
+      # original image is upside-down, so flip it
+      return data[::-1, :, :]
     else:
       raise ValueError("mode can only be either 'human' or 'rgb_array'")
 
