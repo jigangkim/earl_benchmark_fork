@@ -3,7 +3,7 @@ import os
 import numpy as np
 from gym.spaces import Box
 
-from metaworld.envs import reward_utils
+from earl_benchmark.envs.utils import tolerance
 from metaworld.envs.mujoco.sawyer_xyz.sawyer_xyz_env import SawyerXYZEnv, _assert_task_is_set
 from scipy.spatial.transform import Rotation
 
@@ -156,7 +156,7 @@ class SawyerReachV2(SawyerXYZEnv):
         tcp_to_target = np.linalg.norm(tcp - target, axis=-1)
 
         in_place_margin = (np.linalg.norm(self.hand_init_pos - target, axis=-1))
-        in_place = reward_utils.tolerance(tcp_to_target,
+        in_place = tolerance(tcp_to_target,
                                     bounds=(0, self.TARGET_RADIUS),
                                     margin=in_place_margin,
                                     sigmoid='long_tail',)

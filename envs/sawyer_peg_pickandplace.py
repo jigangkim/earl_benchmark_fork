@@ -8,7 +8,7 @@ import os
 import numpy as np
 from gym.spaces import Box
 
-from metaworld.envs import reward_utils
+from earl_benchmark.envs.utils import tolerance
 from metaworld.envs.mujoco.sawyer_xyz.sawyer_xyz_env import SawyerXYZEnv, _assert_task_is_set
 from scipy.spatial.transform import Rotation
 
@@ -157,7 +157,7 @@ class SawyerPegPickAndPlaceV2(SawyerXYZEnv):
   def evaluate_state(self, obs, action):
     obj = obs[4:7]
 
-    reward, tcp_to_obj, tcp_open, obj_to_target, grasp_reward, in_place_reward = self.compute_reward(obs, action)
+    reward, tcp_to_obj, tcp_open, obj_to_target, in_place_reward = self.compute_reward(obs, action)
     grasp_success = float(tcp_to_obj < 0.02 and (tcp_open > 0) and (obj[2] - 0.01 > self.obj_init_pos[2]))
     success = float(obj_to_target <= self.TARGET_RADIUS)
     near_object = float(tcp_to_obj <= 0.03)
@@ -166,7 +166,6 @@ class SawyerPegPickAndPlaceV2(SawyerXYZEnv):
         'success': success,
         'near_object': near_object,
         'grasp_success': grasp_success,
-        'grasp_reward': grasp_reward,
         'in_place_reward': in_place_reward,
         'obj_to_target': obj_to_target,
         'unscaled_reward': reward,
@@ -212,75 +211,36 @@ class SawyerPegPickAndPlaceV2(SawyerXYZEnv):
 
     return self._get_obs()
 
-  def compute_reward(self, obs, action=None):
-    tcp = obs[:3]
-    obj = obs[4:7] - self._get_site_pos('pegHead') \
-                   + self._get_site_pos('pegGrasp')
-    obj_head = obs[4:7] 
-    tcp_opened = obs[3]
-    target = obs[11:14]
+  def compute_reward(self, obs, action=None, vectorized=True):
+    obs = np.atleast_2d(obs)
 
-    tcp_to_obj = np.linalg.norm(obj - tcp)
+    tcp = obs[:,:3]
+    obj = obs[:,4:7] 
+    tcp_opened = obs[:,3]
+    target = obs[:,11:14]
     
-    scale = np.array([1., 2., 2.])
-    #  force agent to pick up object then insert
-    obj_to_target = np.linalg.norm((obj_head - target) * scale)
+    tcp_to_obj = np.linalg.norm(tcp - obj, axis=-1)
+    obj_to_target = np.linalg.norm(obj - target, axis=-1)
 
-    in_place_margin = np.linalg.norm((self.peg_head_pos_init - target) * scale)
-    in_place = reward_utils.tolerance(obj_to_target,
+    in_place_margin = np.linalg.norm(self.peg_head_pos_init - target, axis=-1)
+    in_place = tolerance(obj_to_target,
                                 bounds=(0, self.TARGET_RADIUS),
                                 margin=in_place_margin,
                                 sigmoid='long_tail',)
-    # ip_orig = in_place
-    # brc_col_box_1 = self._get_site_pos('bottom_right_corner_collision_box_1')
-    # tlc_col_box_1 = self._get_site_pos('top_left_corner_collision_box_1')
 
-    # brc_col_box_2 = self._get_site_pos('bottom_right_corner_collision_box_2')
-    # tlc_col_box_2 = self._get_site_pos('top_left_corner_collision_box_2')
-    # collision_box_bottom_1 = reward_utils.rect_prism_tolerance(curr=obj_head,
-    #                                                            one=tlc_col_box_1,
-    #                                                            zero=brc_col_box_1)
-    # collision_box_bottom_2 = reward_utils.rect_prism_tolerance(curr=obj_head,
-    #                                                            one=tlc_col_box_2,
-    #                                                            zero=brc_col_box_2)
-    # collision_boxes = reward_utils.hamacher_product(collision_box_bottom_2,
-    #                                                 collision_box_bottom_1)
-    # in_place = reward_utils.hamacher_product(in_place,
-    #                                          collision_boxes)
+    hand_margin = np.linalg.norm(self.hand_init_pos - obj, axis=-1) + 0.1
+    hand_in_place = tolerance(tcp_to_obj,
+                                bounds=(0, 0.25*self.TARGET_RADIUS),
+                                margin=hand_margin,
+                                sigmoid='gaussian',)
 
-    if tcp_to_obj < 0.08 and (tcp_opened > 0) and (obj[2] - 0.01 > self.obj_init_pos[2]):
-      object_grasped = 1.
-
-    # this is the only part that requires the action, only with dense reward
-    elif self._reward_type == 'dense':
-      pad_success_margin = 0.03
-      object_reach_radius=0.01
-      x_z_margin = 0.005
-      obj_radius = 0.0075
-      object_grasped = self._gripper_caging_reward(action,
-                                                   obj,
-                                                   object_reach_radius=object_reach_radius,
-                                                   obj_radius=obj_radius,
-                                                   pad_success_thresh=pad_success_margin,
-                                                   xz_thresh=x_z_margin,
-                                                   high_density=True)
-    elif self._reward_type == 'sparse':
-      object_grasped = 0.
-
-    in_place_and_object_grasped = reward_utils.hamacher_product(object_grasped,
-                                                                in_place)
-    reward = in_place_and_object_grasped
-
-    if tcp_to_obj < 0.08 and (tcp_opened > 0) and (obj[2] - 0.01 > self.obj_init_pos[2]):
-      reward += 1. + 5 * in_place
-
-    if obj_to_target <= self.TARGET_RADIUS:
-      reward = 10.
+    reward = 3 * hand_in_place + 6 * in_place
+    reward = np.where(obj_to_target < self.TARGET_RADIUS, 10.0, reward)
 
     if self._reward_type == 'sparse':
-      reward = float(self.is_successful(obs=obs))
+      reward = np.array(self.is_successful(obs=obs), dtype=np.float32)
 
-    return [reward, tcp_to_obj, tcp_opened, obj_to_target, object_grasped, in_place]
+    return [np.squeeze(reward), np.squeeze(tcp_to_obj), np.squeeze(tcp_opened), np.squeeze(obj_to_target), np.squeeze(in_place)]
 
   def is_successful(self, obs=None, vectorized=True):
     return self.dist_to_goal(obs=obs, vectorized=vectorized) <= self.TARGET_RADIUS
