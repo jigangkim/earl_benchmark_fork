@@ -48,7 +48,12 @@ class TabletopManipulation(MujocoEnv):
     self._goal_list = goal_states.copy()
     self.goal = self.initial_state.copy()
     self._reset_at_goal = reset_at_goal  # use only in train envs without resets
+    self.has_object_visible = True
     super().__init__(model_path=self.MODEL_PATH_TREE, frame_skip=15)
+
+  def set_object_visibility(self, visible=True):
+    self.has_object_visible = visible
+    return self._get_obs()
 
   def _get_obs(self):
     return np.concatenate([
@@ -177,14 +182,15 @@ class TabletopManipulation(MujocoEnv):
       # remove gripper, attached object from reward computation
       obs = np.atleast_2d(obs)
       reward = -np.linalg.norm(obs[:,2:4] - obs[:,8:-2], axis=-1)
-      for obj_idx in range(1, 2):
-        reward += 2. * np.exp(
-            -(np.linalg.norm(obs[:,2 * obj_idx:2 * obj_idx + 2] -
-                             obs[:,2 * obj_idx + 6:2 * obj_idx + 8], axis=-1)**2) / 0.01)
+      if self.has_object_visible:
+        for obj_idx in range(1, 2):
+          reward += 2. * np.exp(
+              -(np.linalg.norm(obs[:,2 * obj_idx:2 * obj_idx + 2] -
+                              obs[:,2 * obj_idx + 6:2 * obj_idx + 8], axis=-1)**2) / 0.01)
 
-      grip_to_object = 0.5 * np.linalg.norm(obs[:,:2] - obs[:,2:4], axis=-1)
-      reward += -grip_to_object
-      reward += 0.5 * np.exp(-(grip_to_object**2) / 0.01)
+        grip_to_object = 0.5 * np.linalg.norm(obs[:,:2] - obs[:,2:4], axis=-1)
+        reward += -grip_to_object
+        reward += 0.5 * np.exp(-(grip_to_object**2) / 0.01)
 
     return np.squeeze(reward)
 
@@ -195,4 +201,7 @@ class TabletopManipulation(MujocoEnv):
     if obs is None:
       obs = self._get_obs()
 
-    return np.linalg.norm(obs[:,:4] - obs[:,6:-2], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[:4] - obs[6:-2])
+    if self.has_object_visible:
+      return np.linalg.norm(obs[:,:4] - obs[:,6:-2], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[:4] - obs[6:-2])
+    else:
+      return np.linalg.norm(obs[:,:2] - obs[:,6:-4], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[:2] - obs[6:-4])

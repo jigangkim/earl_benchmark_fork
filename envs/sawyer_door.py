@@ -20,6 +20,7 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
 
   def __init__(self, reward_type='sparse', reset_at_goal=False):
     self._reset_at_goal = reset_at_goal
+    self.has_object_visible = True
 
     super().__init__()
     hand_low = (-0.5, 0.40, 0.05)
@@ -82,6 +83,10 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
       np.hstack((self._HAND_SPACE.low, gripper_low, obj_low, self._HAND_SPACE.low, gripper_low, goal_low)),
       np.hstack((self._HAND_SPACE.high, gripper_high, obj_high, self._HAND_SPACE.high, gripper_high, goal_high))
     )
+
+  def set_object_visibility(self, visible=True):
+    self.has_object_visible = visible
+    return self._get_obs() 
 
   def _get_obs(self):
     obs = super()._get_obs()
@@ -174,42 +179,67 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
     obs = np.atleast_2d(obs)
 
     _TARGET_RADIUS = 0.05
-    tcp = obs[:,:3]
-    obj = obs[:,4:7]
-    target = obs[:,11:14]
+    if self.has_object_visible:
+      tcp = obs[:,:3]
+      obj = obs[:,4:7]
+      target = obs[:,11:14]
 
-    tcp_to_target = np.linalg.norm(tcp - target, axis=-1)
-    tcp_to_obj = np.linalg.norm(tcp - obj, axis=-1)
-    obj_to_target = np.linalg.norm(obj - target, axis=-1)
+      tcp_to_target = np.linalg.norm(tcp - target, axis=-1)
+      tcp_to_obj = np.linalg.norm(tcp - obj, axis=-1)
+      obj_to_target = np.linalg.norm(obj - target, axis=-1)
 
-    in_place_margin = np.linalg.norm(self.obj_init_pos - target, axis=-1)
-    in_place = tolerance(obj_to_target,
-                                bounds=(0, _TARGET_RADIUS),
-                                margin=in_place_margin,
-                                sigmoid='gaussian',)
+      in_place_margin = np.linalg.norm(self.obj_init_pos - target, axis=-1)
+      in_place = tolerance(obj_to_target,
+                                  bounds=(0, _TARGET_RADIUS),
+                                  margin=in_place_margin,
+                                  sigmoid='gaussian',)
 
-    hand_margin = np.linalg.norm(self.hand_init_pos - obj, axis=-1) + 0.1
-    hand_in_place = tolerance(tcp_to_obj,
-                                bounds=(0, 0.25*_TARGET_RADIUS),
-                                margin=hand_margin,
-                                sigmoid='gaussian',)
+      hand_margin = np.linalg.norm(self.hand_init_pos - obj, axis=-1) + 0.1
+      hand_in_place = tolerance(tcp_to_obj,
+                                  bounds=(0, 0.25*_TARGET_RADIUS),
+                                  margin=hand_margin,
+                                  sigmoid='gaussian',)
 
-    reward = 3 * hand_in_place + 6 * in_place
-    reward = np.where(obj_to_target < _TARGET_RADIUS, 10.0, reward)
+      reward = 3 * hand_in_place + 6 * in_place
+      reward = np.where(obj_to_target < _TARGET_RADIUS, 10.0, reward)
 
-    if self._reward_type == 'sparse':
-      reward = np.array(self.is_successful(obs=obs), dtype=np.float32)
+      if self._reward_type == 'sparse':
+        reward = np.array(self.is_successful(obs=obs), dtype=np.float32)
 
-    return [np.squeeze(reward), np.squeeze(obj_to_target), np.squeeze(hand_in_place)]
+      return [np.squeeze(reward), np.squeeze(obj_to_target), np.squeeze(hand_in_place)]
+    else:
+      tcp = obs[:,:3]
+      target = obs[:,7:10]
+
+      tcp_to_target = np.linalg.norm(tcp - target, axis=-1)
+
+      in_place_margin = (np.linalg.norm(self.hand_init_pos - target, axis=-1))
+      in_place = tolerance(tcp_to_target,
+                                  bounds=(0, _TARGET_RADIUS),
+                                  margin=in_place_margin,
+                                  sigmoid='long_tail',)
+
+      if self._reward_type == 'dense':
+          reward = 10 * in_place
+      elif self._reward_type == 'sparse':
+          reward = np.array(self.is_successful(obs=obs), dtype=np.float32)
+
+      return [np.squeeze(reward), np.squeeze(tcp_to_target), np.squeeze(in_place)]
 
   def is_successful(self, obs=None, vectorized=True):
-    return self.dist_to_goal(obs=obs, vectorized=vectorized) <= 0.02
+    if self.has_object_visible:
+      return self.dist_to_goal(obs=obs, vectorized=vectorized) <= 0.02
+    else:
+      return self.dist_to_goal(obs=obs, vectorized=vectorized) <= 0.05
 
   def dist_to_goal(self, obs=None, vectorized=True):
     if obs is None:
       obs = self._get_obs()
     
-    return np.linalg.norm(obs[:,4:7] - obs[:,11:14], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[4:7] - obs[11:14])
+    if self.has_object_visible:
+      return np.linalg.norm(obs[:,4:7] - obs[:,11:14], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[4:7] - obs[11:14])
+    else:
+      return np.linalg.norm(obs[:,:3] - obs[:,7:10], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[:3] - obs[7:10])
 
   # functions for rendering
   def viewer_setup(self):
