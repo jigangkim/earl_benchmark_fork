@@ -15,12 +15,15 @@ initial_states = np.array([[0.00591636, 0.39968333, 0.19493164, 1.0,
 goal_states = np.array([[0.29072163, 0.74286009, 0.10003595, 1.0,
                         0.29072163, 0.74286009, 0.10003595]])
 
+VEL_FOR_OBS_OPTIONS = ['none', 'door', 'all']
+
 class SawyerDoorV2(SawyerDoorCloseEnvV2):
   max_path_length = int(1e8)
 
   def __init__(self, reward_type='sparse', reset_at_goal=False):
     self._reset_at_goal = reset_at_goal
     self.has_object_visible = True
+    self.vel_for_obs = VEL_FOR_OBS_OPTIONS[0]
 
     super().__init__()
     hand_low = (-0.5, 0.40, 0.05)
@@ -79,23 +82,57 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
     goal_high = self.goal_space.high
     gripper_low = -1
     gripper_high = 1
-    return Box(
-      np.hstack((self._HAND_SPACE.low, gripper_low, obj_low, self._HAND_SPACE.low, gripper_low, goal_low)),
-      np.hstack((self._HAND_SPACE.high, gripper_high, obj_high, self._HAND_SPACE.high, gripper_high, goal_high))
-    )
+
+    if self.vel_for_obs == VEL_FOR_OBS_OPTIONS[0]:
+      return Box(
+        np.hstack((self._HAND_SPACE.low, gripper_low, obj_low, self._HAND_SPACE.low, gripper_low, goal_low)),
+        np.hstack((self._HAND_SPACE.high, gripper_high, obj_high, self._HAND_SPACE.high, gripper_high, goal_high))
+      )
+    elif self.vel_for_obs == VEL_FOR_OBS_OPTIONS[1]: # add door velocity
+      return Box(
+        np.hstack((self._HAND_SPACE.low, gripper_low, obj_low, -np.inf*np.ones([3]), self._HAND_SPACE.low, gripper_low, goal_low)),
+        np.hstack((self._HAND_SPACE.high, gripper_high, obj_high, np.inf*np.ones([3]), self._HAND_SPACE.high, gripper_high, goal_high))
+      )
+    elif self.vel_for_obs == VEL_FOR_OBS_OPTIONS[2]: # add hand/door velocity
+      return Box(
+        np.hstack((self._HAND_SPACE.low, gripper_low, obj_low, -np.inf*np.ones([6]), self._HAND_SPACE.low, gripper_low, goal_low)),
+        np.hstack((self._HAND_SPACE.high, gripper_high, obj_high, np.inf*np.ones([6]), self._HAND_SPACE.high, gripper_high, goal_high))
+      )
+    else:
+      raise ValueError("Invalid vel_for_obs option")
 
   def set_object_visibility(self, visible=True):
     self.has_object_visible = visible
     return self._get_obs() 
+
+  def _get_vel_objects(self):
+    return self.data.get_geom_xvelp('handle').copy()
+  
+  def get_endeff_vel(self):
+    return self.data.get_body_xvelp('hand').copy()
 
   def _get_obs(self):
     obs = super()._get_obs()
     # xyz and gripper distance for end effector
     endeff_config = obs[:4]
     obj_pos = self._get_pos_objects()
-    obs = np.concatenate([
-        endeff_config, obj_pos, self.goal,
-    ])
+    if self.vel_for_obs == VEL_FOR_OBS_OPTIONS[0]:
+      obs = np.concatenate([
+          endeff_config, obj_pos, self.goal,
+      ])
+    elif self.vel_for_obs == VEL_FOR_OBS_OPTIONS[1]: # add door velocity
+      obj_vel = self._get_vel_objects()
+      obs = np.concatenate([
+          endeff_config, obj_pos, obj_vel, self.goal,
+      ])
+    elif self.vel_for_obs == VEL_FOR_OBS_OPTIONS[2]: # add hand/door velocity
+      obj_vel = self._get_vel_objects()
+      ee_vel = self.get_endeff_vel()
+      obs = np.concatenate([
+          endeff_config, obj_pos, ee_vel, obj_vel, self.goal,
+      ])
+    else:
+      raise ValueError("Invalid vel_for_obs option")
     return obs
 
   # need to expose the default goal, useful for multi-goal settings
@@ -179,10 +216,18 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
     obs = np.atleast_2d(obs)
 
     _TARGET_RADIUS = 0.05
+    if self.vel_for_obs == VEL_FOR_OBS_OPTIONS[0]:
+      idx_offset = 0
+    elif self.vel_for_obs == VEL_FOR_OBS_OPTIONS[1]: # add door velocity
+      idx_offset = 3
+    elif self.vel_for_obs == VEL_FOR_OBS_OPTIONS[2]: # add hand/door velocity
+      idx_offset = 6
+    else:
+      raise ValueError("Invalid vel_for_obs option")
     if self.has_object_visible:
       tcp = obs[:,:3]
       obj = obs[:,4:7]
-      target = obs[:,11:14]
+      target = obs[:,idx_offset+11:idx_offset+14]
 
       tcp_to_target = np.linalg.norm(tcp - target, axis=-1)
       tcp_to_obj = np.linalg.norm(tcp - obj, axis=-1)
@@ -209,7 +254,7 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
       return [np.squeeze(reward), np.squeeze(obj_to_target), np.squeeze(hand_in_place)]
     else:
       tcp = obs[:,:3]
-      target = obs[:,7:10]
+      target = obs[:,idx_offset+7:idx_offset+10]
 
       tcp_to_target = np.linalg.norm(tcp - target, axis=-1)
 
@@ -236,10 +281,18 @@ class SawyerDoorV2(SawyerDoorCloseEnvV2):
     if obs is None:
       obs = self._get_obs()
     
-    if self.has_object_visible:
-      return np.linalg.norm(obs[:,4:7] - obs[:,11:14], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[4:7] - obs[11:14])
+    if self.vel_for_obs == VEL_FOR_OBS_OPTIONS[0]:
+      idx_offset = 0
+    elif self.vel_for_obs == VEL_FOR_OBS_OPTIONS[1]: # add door velocity
+      idx_offset = 3
+    elif self.vel_for_obs == VEL_FOR_OBS_OPTIONS[2]: # add hand/door velocity
+      idx_offset = 6
     else:
-      return np.linalg.norm(obs[:,:3] - obs[:,7:10], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[:3] - obs[7:10])
+      raise ValueError("Invalid vel_for_obs option")
+    if self.has_object_visible:
+      return np.linalg.norm(obs[:,4:7] - obs[:,idx_offset+11:idx_offset+14], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[4:7] - obs[idx_offset+11:idx_offset+14])
+    else:
+      return np.linalg.norm(obs[:,:3] - obs[:,idx_offset+7:idx_offset+10], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[:3] - obs[idx_offset+7:idx_offset+10])
 
   # functions for rendering
   def viewer_setup(self):
