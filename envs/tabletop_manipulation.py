@@ -2,6 +2,7 @@
 
 import os
 
+import gym
 from gym import spaces
 from gym.envs.mujoco import MujocoEnv
 
@@ -93,6 +94,14 @@ class TabletopManipulation(MujocoEnv):
     qpos = np.concatenate([qpos[:4], np.array([-10])])
     qvel = self.sim.data.qvel.copy()
     super().set_state(qpos, qvel)
+
+    if type(self) == TabletopManipulationImage: # visually indicate grasp status for image env
+      if self.attached_object != (-1, -1): # if fist has grasped an object
+        self.sim.model.geom_rgba[self.sim.model.geom_name2id('pointbodyr:attached')][3] = 1.0
+        self.sim.model.geom_rgba[self.sim.model.geom_name2id('pointbodyr')][3] = 0.0
+      else: # if fist has not grasped an object
+        self.sim.model.geom_rgba[self.sim.model.geom_name2id('pointbodyr:attached')][3] = 0.0
+        self.sim.model.geom_rgba[self.sim.model.geom_name2id('pointbodyr')][3] = 1.0
 
   def reset(self):
     self.attached_object = (-1, -1)
@@ -205,3 +214,71 @@ class TabletopManipulation(MujocoEnv):
       return np.linalg.norm(obs[:,:4] - obs[:,6:-2], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[:4] - obs[6:-2])
     else:
       return np.linalg.norm(obs[:,:2] - obs[:,6:-4], axis=-1) if obs.ndim == 2 else np.linalg.norm(obs[:2] - obs[6:-4])
+    
+
+class TabletopManipulationImage(TabletopManipulation):
+  def __init__(self, camera_name="original"):
+    self.reset_atleast_once = False
+    self._camera_name = camera_name
+    super(TabletopManipulationImage, self).__init__(
+      task_list="rc_r-rc_k-rc_g-rc_b",
+      reward_type="sparse",
+      reset_at_goal=False)
+    self._old_observation_space = self.observation_space
+    self._new_observation_space = gym.spaces.Box(
+        low=np.full((64*64*6), 0),
+        high=np.full((64*64*6), 255),
+        dtype=np.uint8,
+    )
+    self.observation_space = self._new_observation_space
+
+    # disable goal visualizer
+    self.sim.model.site_rgba[self.sim.model.site_name2id("goal:fist")][3] = 0.0
+    self.sim.model.site_rgba[self.sim.model.site_name2id("goal:redcube")][3] = 0.0
+
+  def reset(self):
+    self.reset_atleast_once = True
+
+    # generate new goal image
+    # self.observation_space = self._old_observation_space
+    self._reset_at_goal = True
+    s = super(TabletopManipulationImage, self).reset()
+    # self.observation_space = self._new_observation_space
+    self._reset_at_goal = False
+    self._goal_img = self.observation(s)
+
+    # initial state image
+    # self.observation_space = self._old_observation_space
+    s = super(TabletopManipulationImage, self).reset()
+    # self.observation_space = self._new_observation_space
+    img = self.observation(s)
+
+    return np.concatenate([img, self._goal_img])
+  
+  def step(self, action):
+    if self.reset_atleast_once:
+      s, _, _, _ = super(TabletopManipulationImage, self).step(action)
+      done = False
+      r = self.compute_reward(s)
+      info = {'is_success': self.is_successful(obs=s)}
+      img = self.observation(s)
+      return np.concatenate([img, self._goal_img]), r, done, info
+    else: # workaround for MujocoEnv initialization
+      return super(TabletopManipulationImage, self).step(action)
+
+  def observation(self, observation):
+    img = self.render(mode='rgb_array', height=64, width=64)
+    return img.transpose(2,0,1).flatten() # HWC -> CHW and then flatten
+
+  def viewer_setup(self):
+    super(TabletopManipulationImage, self).viewer_setup()
+    if self._camera_name == 'original':
+      pass
+    elif self._camera_name == 'camera1':
+      self.viewer.cam.lookat[1] = 0.0
+      self.viewer.cam.distance = 10.5
+    elif self._camera_name == 'camera2':
+      self.viewer.cam.distance = 10
+      self.viewer.cam.elevation = -90
+    else:
+      raise NotImplementedError
