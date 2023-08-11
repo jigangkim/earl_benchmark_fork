@@ -101,7 +101,7 @@ class TabletopManipulation(MujocoEnv):
     if self._reset_at_goal:
       self.reset_goal()
       full_qpos[:4] = self.goal[:4]
-      full_qpos[:4] = np.random.uniform(-2.5, 2.5, size=(4,))
+      # full_qpos[:4] = np.random.uniform(-2.5, 2.5, size=(4,))
     else:
       full_qpos[:4] = self.initial_state[:4]
       self.reset_goal()
