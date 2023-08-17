@@ -3,6 +3,7 @@
 import os
 import numpy as np
 import pickle
+from types import SimpleNamespace
 
 from earl_benchmark.wrappers import persistent_state_wrapper
 from earl_benchmark.wrappers import lifelong_wrapper
@@ -17,6 +18,12 @@ deployment_eval_config = {
   'tabletop_manipulation': {
     'num_initial_state_samples': 1,
     'num_goals': 4,
+    'train_horizon': int(2e5),
+    'eval_horizon': 200,
+  },
+  'tabletop_manipulation_image': {
+    'num_initial_state_samples': 0,
+    'num_goals': 0,
     'train_horizon': int(2e5),
     'eval_horizon': 200,
   },
@@ -63,6 +70,12 @@ continuing_eval_config = {
   'tabletop_manipulation': {
     'num_initial_state_samples': 1,
     'num_goals': 4,
+    'train_horizon': int(5e4),
+    'goal_change_frequency': 400,
+  },
+  'tabletop_manipulation_image': {
+    'num_initial_state_samples': 0,
+    'num_goals': 0,
     'train_horizon': int(5e4),
     'goal_change_frequency': 400,
   },
@@ -139,6 +152,9 @@ class EARLEnvs(object):
       train_env = tabletop_manipulation.TabletopManipulation(task_list='rc_r-rc_k-rc_g-rc_b',
                                                              reward_type=self._reward_type,
                                                              reset_at_goal=self._reset_train_env_at_goal)
+    elif self._env_name == 'tabletop_manipulation_image':
+      from earl_benchmark.envs import tabletop_manipulation
+      train_env = tabletop_manipulation.TabletopManipulationImage(camera_name='camera1')
     elif self._env_name == 'minitaur':
       try:
         #from pybullet_envs.bullet import minitaur_gym_env
@@ -184,6 +200,9 @@ class EARLEnvs(object):
       from earl_benchmark.envs import tabletop_manipulation
       eval_env = tabletop_manipulation.TabletopManipulation(task_list='rc_r-rc_k-rc_g-rc_b',
                                                             reward_type=self._reward_type)
+    elif self._env_name == 'tabletop_manipulation_image':
+      from earl_benchmark.envs import tabletop_manipulation
+      eval_env = tabletop_manipulation.TabletopManipulationImage(camera_name='camera1')
     elif self._env_name == 'sawyer_door':
       from earl_benchmark.envs import sawyer_door
       eval_env = sawyer_door.SawyerDoorV2(reward_type=self._reward_type)
@@ -254,6 +273,9 @@ class EARLEnvs(object):
       kitchen_task = self._kwargs.get('kitchen_task', deployment_eval_config[self._env_name]['task'])  
       env = kitchen.Kitchen(task=kitchen_task, reward_type=self._reward_type)
       return env.get_init_states()
+    
+    elif self._env_name == 'tabletop_manipulation_image':
+      return SimpleNamespace(shape=(-1,3*64*64)) # dummy object for shape attribute
 
     else:
       # make a new copy of environment to ensure that related parameters do not get affected by collection of reset states
@@ -285,6 +307,9 @@ class EARLEnvs(object):
     elif self._env_name == 'sawyer_pickandplace':
       from earl_benchmark.envs import sawyer_peg_pickandplace
       return sawyer_peg_pickandplace.goal_states
+    
+    elif self._env_name == 'tabletop_manipulation_image':
+      return SimpleNamespace(shape=(-1,3*64*64)) # dummy object for shape attribute
 
     if self._env_name == 'kitchen':
       from earl_benchmark.envs import kitchen

@@ -226,8 +226,8 @@ class TabletopManipulationImage(TabletopManipulation):
       reset_at_goal=False)
     self._old_observation_space = self.observation_space
     self._new_observation_space = gym.spaces.Box(
-        low=np.full((64*64*6), 0),
-        high=np.full((64*64*6), 255),
+        low=np.full((6*64*64), 0),
+        high=np.full((6*64*64), 255),
         dtype=np.uint8,
     )
     self.observation_space = self._new_observation_space
