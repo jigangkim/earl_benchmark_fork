@@ -108,9 +108,9 @@ class TabletopManipulation(MujocoEnv):
     full_qpos = np.zeros((4,))
 
     if self._reset_at_goal:
-      self.reset_goal()
-      full_qpos[:4] = self.goal[:4]
-      # full_qpos[:4] = np.random.uniform(-2.5, 2.5, size=(4,))
+      full_qpos[:4] = self.get_next_goal()[:4] # goal becomes initial
+      self.goal = self.initial_state.copy() # initial becomes goal
+      self.reset_goal(self.goal)
     else:
       full_qpos[:4] = self.initial_state[:4]
       self.reset_goal()
@@ -245,12 +245,14 @@ class TabletopManipulationImage(TabletopManipulation):
     s = super(TabletopManipulationImage, self).reset()
     # self.observation_space = self._new_observation_space
     self._reset_at_goal = False
+    self._goal = s[:6].copy()
     self._goal_img = self.observation(s)
 
     # initial state image
     # self.observation_space = self._old_observation_space
     s = super(TabletopManipulationImage, self).reset()
     # self.observation_space = self._new_observation_space
+    super(TabletopManipulationImage, self).reset_goal(goal=self._goal) # set goal state corresponding to _goal_img
     img = self.observation(s)
 
     return np.concatenate([img, self._goal_img])
