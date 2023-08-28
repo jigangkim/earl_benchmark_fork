@@ -232,10 +232,6 @@ class TabletopManipulationImage(TabletopManipulation):
     )
     self.observation_space = self._new_observation_space
 
-    # disable goal visualizer
-    self.sim.model.site_rgba[self.sim.model.site_name2id("goal:fist")][3] = 0.0
-    self.sim.model.site_rgba[self.sim.model.site_name2id("goal:redcube")][3] = 0.0
-
   def reset(self):
     self.reset_atleast_once = True
 
@@ -269,7 +265,11 @@ class TabletopManipulationImage(TabletopManipulation):
       return super(TabletopManipulationImage, self).step(action)
 
   def observation(self, observation):
+    self.sim.model.site_rgba[self.sim.model.site_name2id("goal:fist")][3] = 0.0
+    self.sim.model.site_rgba[self.sim.model.site_name2id("goal:redcube")][3] = 0.0
     img = self.render(mode='rgb_array', height=64, width=64)
+    self.sim.model.site_rgba[self.sim.model.site_name2id("goal:fist")][3] = 1.0
+    self.sim.model.site_rgba[self.sim.model.site_name2id("goal:redcube")][3] = 1.0
     return img.transpose(2,0,1).flatten() # HWC -> CHW and then flatten
 
   def viewer_setup(self):
